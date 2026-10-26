@@ -15,6 +15,7 @@ export interface HoverEditorSettings {
   initialWidth: string;
   showViewHeader: boolean;
   imageZoom: boolean;
+  hideBlockProperties: boolean;
   hoverEmbeds: boolean;
   footnotes: "always" | "never";
   headings: "always" | "never";
@@ -33,6 +34,7 @@ export const DEFAULT_SETTINGS: HoverEditorSettings = {
   initialWidth: "400px",
   showViewHeader: false,
   imageZoom: true,
+  hideBlockProperties: false,
   hoverEmbeds: false,
   footnotes: requireApiVersion("1.6") ? "never" : "always",
   headings: "always",
@@ -188,6 +190,19 @@ export class SettingTab extends PluginSettingTab {
         toggle.setValue(this.plugin.settings.imageZoom).onChange(value => {
           this.plugin.settings.imageZoom = value;
           this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName("Hide block properties")
+      .setDesc("Hide the block properties / metadata container (class: metadata-container) within the popover content")
+      .addToggle(toggle =>
+        toggle.setValue(this.plugin.settings.hideBlockProperties).onChange(value => {
+          this.plugin.settings.hideBlockProperties = value;
+          this.plugin.saveSettings();
+          this.plugin.app.workspace.iterateAllLeaves(leaf => {
+            leaf.containerEl.closest(".hover-editor")?.toggleClass("hide-block-properties", value);
+          });
         }),
       );
 
