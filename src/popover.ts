@@ -319,7 +319,31 @@ export class HoverEditor extends nosuper(HoverPopover) {
   }
 
   getDefaultMode() {
-    return this.parent?.view?.getMode ? this.parent.view.getMode() : "preview";
+    // Bug fix: previously this only consulted `this.parent?.view`, which is often
+    // missing or is not a markdown view (search results, bookmarks, graph, embeds,
+    // or popovers spawned via commands where the parent is a bare WorkspaceLeaf).
+    // In those cases "Match current view" silently fell back to "preview", making
+    // the setting useless. Now we resolve the actual state of the active editor by
+    // walking through progressively broader fallbacks before giving up.
+    const parentView = this.parent?.view as View | undefined;
+    if (parentView?.getMode) return parentView.getMode();
+
+    // The parent may itself be a view-like object (e.g. a MarkdownView passed
+    // directly rather than wrapped in a leaf) that exposes getMode().
+    const parentAsView = this.parent as unknown as View | undefined;
+    if (parentAsView?.getMode) return parentAsView.getMode();
+
+    // Next, ask the workspace for the currently active markdown view.
+    const activeView = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+    if (activeView?.getMode) return activeView.getMode();
+
+    // Finally, fall back to workspace.activeEditor (Obsidian >= 1.6), whose mode
+    // tracks the live state of the active source/preview editor.
+    const activeEditor = (this.plugin.app.workspace as unknown as {activeEditor?: {mode?: string; view?: View}}).activeEditor;
+    if (activeEditor?.mode) return activeEditor.mode;
+    if (activeEditor?.view?.getMode) return activeEditor.view.getMode();
+
+    return "preview";
   }
 
   updateLeaves() {
