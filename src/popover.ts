@@ -1036,7 +1036,40 @@ export class HoverEditor extends nosuper(HoverPopover) {
       this.displayOpenFileAction(file);
       return;
     }
+    // Block-level references (#^blockid): Obsidian's page-preview resolves these lazily
+    // (it calls getSectionInfo() when applying the ephemeral state), so its native hover
+    // always jumps to the right block even if the metadata cache is stale or mid-update.
+    // Hover Editor instead pre-resolves the subpath eagerly via buildEphemeralState();
+    // when resolveSubpath() can't find the block id at that moment (stale/missing cache,
+    // race during file update, or a view mode where only `line` is honored), the subpath
+    // info is silently dropped and the popover opens the file scrolled to the very top.
+    // Mirror the native behavior by resolving the block position again at display time:
+    // keep the raw subpath, derive a line fallback from the current cache, and re-apply
+    // the ephemeral state once the view is shown so we scroll to the block, not line 0.
+    const blockSubpath = link.subpath && link.subpath.startsWith("#^") ? link.subpath : undefined;
     eState = Object.assign(this.buildEphemeralState(file, link), eState);
+    if (blockSubpath && eState.line === undefined) {
+      const cache = this.plugin.app.metadataCache.getFileCache(file);
+      const resolved = cache ? resolveSubpath(cache, blockSubpath) : undefined;
+      if (resolved) {
+        eState.line = resolved.start.line;
+        eState.startLoc = resolved.start;
+        eState.endLoc = resolved.end || undefined;
+      } else {
+        // Cache hasn't indexed the block yet; retry until it catches up (max ~500ms)
+        for (let i = 0; i < 10 && eState.line === undefined; i++) {
+          await defer((callback: () => void) => setTimeout(callback, 50));
+          if (this.detaching) return;
+          const c = this.plugin.app.metadataCache.getFileCache(file);
+          const r = c ? resolveSubpath(c, blockSubpath) : undefined;
+          if (r) {
+            eState.line = r.start.line;
+            eState.startLoc = r.start;
+            eState.endLoc = r.end || undefined;
+          }
+        }
+      }
+    }
     const parentMode = this.getDefaultMode();
     const state = this.buildState(parentMode, eState);
     const leaf = await this.openFile(file, state, createInLeaf);
@@ -1065,6 +1098,26 @@ export class HoverEditor extends nosuper(HoverPopover) {
         leaf?.view?.editMode?.reinit?.();
       leaf?.view?.setEphemeralState(state.eState);
     });
+    if (blockSubpath) {
+      // Re-apply the resolved block position once the view is actually shown.
+      // If only the raw subpath survived (preview mode resolves it lazily) or the
+      // editor wasn't ready during openFile(), this ensures we scroll to the block
+      // instead of being stuck at the top of the file.
+      this.whenShown(() => {
+        if (this.detaching || !leaf?.view) return;
+        const finalEState = Object.assign({}, state.eState);
+        if (finalEState.line === undefined) {
+          const cache = this.plugin.app.metadataCache.getFileCache(file);
+          const resolved = cache ? resolveSubpath(cache, blockSubpath) : undefined;
+          if (resolved) {
+            finalEState.line = resolved.start.line;
+            finalEState.startLoc = resolved.start;
+            finalEState.endLoc = resolved.end || undefined;
+          }
+        }
+        leaf.view.setEphemeralState(finalEState);
+      });
+    }
   }
 
   displayOpenFileAction(file: TFile) {
