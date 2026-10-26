@@ -11,14 +11,14 @@ package-lock.json
 
 # Don't include the compiled main.js file in the repo.
 # They should be uploaded to GitHub releases instead.
-main.js
+/main.js
 
 # Exclude sourcemaps
 *.map
 
 # obsidian
 data.json
-dist
+# dist is intentionally committed so build output is visible on GitHub
 
 # yarn
 yarn.lock
