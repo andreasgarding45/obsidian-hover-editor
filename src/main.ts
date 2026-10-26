@@ -12,6 +12,7 @@ import {
   Menu,
   parseLinktext,
   Platform,
+  resolveSubpath,
   Plugin,
   PopoverState,
   requireApiVersion,
@@ -445,6 +446,29 @@ export default class HoverEditorPlugin extends Plugin {
             } else if (subpath.startsWith("#^")) {
               if (plugin.settings.blocks !== "always") {
                 return old.call(this, parent, targetEl, linkText, path, state, ...args);
+              }
+              // BUGFIX: Obsidian core hanya mengirim `subpath` mentah (mis. "#^abc123")
+              // pada EphemeralState untuk referensi blok — tanpa `line`/`startLoc`.
+              // Konsumen (termasuk plugin ini) wajib me-resolve subpath terhadap
+              // metadataCache untuk mendapatkan lokasi baris. Tanpa langkah ini,
+              // popover membuka berkas dengan benar tetapi tidak pernah scroll ke
+              // blok sehingga tampilan terjebak di bagian paling atas berkas.
+              // (Referensi heading ditangani oleh jalur lain di Obsidian core;
+              //  jalur blok-ref inilah yang bocor — lihat issue #189/#267.)
+              if (!state || (!("line" in state) && !("startLoc" in state))) {
+                const blockFile = this.app.metadataCache.getFirstLinkpathDest(parseLinktext(linkText).path, path);
+                if (blockFile) {
+                  const cache = this.app.metadataCache.getFileCache(blockFile);
+                  const resolved = cache ? resolveSubpath(cache, subpath) : null;
+                  if (resolved) {
+                    state = Object.assign({}, state, {
+                      subpath: subpath,
+                      line: resolved.start.line,
+                      startLoc: resolved.start,
+                      endLoc: resolved.end ?? undefined,
+                    });
+                  }
+                }
               }
             } else {
               if (plugin.settings.headings !== "always") {
