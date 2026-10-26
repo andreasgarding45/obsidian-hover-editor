@@ -87,6 +87,7 @@ export default class HoverEditorPlugin extends Plugin {
 
     await this.loadSettings();
     this.registerSettingsTab();
+    this.applyPopoverFontSize();
 
     this.app.workspace.onLayoutReady(() => {
       this.patchSlidingPanes();
@@ -582,6 +583,7 @@ export default class HoverEditorPlugin extends Plugin {
 
   onunload(): void {
     HoverEditor.activePopovers().forEach(popover => popover.hide());
+    this.removePopoverFontSize();
   }
 
   async loadSettings() {
@@ -590,6 +592,28 @@ export default class HoverEditorPlugin extends Plugin {
 
   saveSettings() {
     this.saveData(this.settings);
+  }
+
+  /**
+   * Overrides the --popover-font-size CSS variable (used for the base text of
+   * hover editors in both reading and editing mode) with the value from the
+   * settings. If the setting is empty, the variable is left untouched so that
+   * Obsidian's default value applies.
+   */
+  applyPopoverFontSize() {
+    const fontSize = this.settings.popoverFontSize.trim();
+    if (fontSize) {
+      // accepts any valid CSS font-size value, e.g. "14px" or "var(--font-ui-small)"
+      document.body.style.setProperty("--popover-font-size", fontSize);
+    } else {
+      this.removePopoverFontSize();
+    }
+    // ensure open popovers pick up the new value
+    this.app.workspace.trigger("css-change");
+  }
+
+  removePopoverFontSize() {
+    document.body.style.removeProperty("--popover-font-size");
   }
 
   registerCommands() {
