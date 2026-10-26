@@ -13,6 +13,7 @@ export interface HoverEditorSettings {
   snapToEdges: boolean;
   initialHeight: string;
   initialWidth: string;
+  popoverFontSize: string;
   showViewHeader: boolean;
   imageZoom: boolean;
   hideBlockProperties: boolean;
@@ -32,6 +33,7 @@ export const DEFAULT_SETTINGS: HoverEditorSettings = {
   snapToEdges: false,
   initialHeight: "340px",
   initialWidth: "400px",
+  popoverFontSize: "",
   showViewHeader: false,
   imageZoom: true,
   hideBlockProperties: false,
@@ -231,6 +233,23 @@ export class SettingTab extends PluginSettingTab {
           value = parseCssUnitValue(value) || DEFAULT_SETTINGS.initialHeight;
           this.plugin.settings.initialHeight = value;
           this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Popover font size")
+      .setDesc(
+        `Overrides the --popover-font-size CSS variable used for the base text in hover editors (both reading and editing mode).
+         Leave empty to keep Obsidian's default value. Accepts any valid CSS font-size value, including other variables such as var(--font-ui-small).`,
+      )
+      .addText(textfield => {
+        textfield.setPlaceholder("var(--font-ui-small)");
+        textfield.inputEl.type = "text";
+        textfield.setValue(this.plugin.settings.popoverFontSize);
+        textfield.onChange(async value => {
+          this.plugin.settings.popoverFontSize = value.trim();
+          await this.plugin.saveSettings();
+          this.plugin.applyPopoverFontSize();
         });
       });
 
