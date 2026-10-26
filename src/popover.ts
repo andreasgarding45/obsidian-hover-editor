@@ -222,6 +222,7 @@ export class HoverEditor extends nosuper(HoverPopover) {
     // custom logic begin
     popovers.set(this.hoverEl, this);
     this.hoverEl.addClass("hover-editor");
+    if (this.plugin.settings.hideBlockProperties) this.hoverEl.addClass("hide-block-properties");
     this.containerEl = this.hoverEl.createDiv("popover-content");
     this.buildWindowControls();
     this.setInitialDimensions();

@@ -580,3 +580,9 @@ body .popover.hover-editor .view-content {
 }
 
 /* end: zoomable images feature */
+
+/* begin: hide block properties feature */
+.popover.hover-editor.hide-block-properties .popover-content .metadata-container {
+  display: none;
+}
+/* end: hide block properties feature */
